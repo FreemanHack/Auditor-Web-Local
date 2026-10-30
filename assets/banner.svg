@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="titulo desc">
+  <title id="titulo">Auditor de Seguridad Web Local</title>
+  <desc id="desc">Detección y remediación de vulnerabilidades web en Windows. Por FreemanHack.</desc>
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b12"/>
+      <stop offset="1" stop-color="#101828"/>
+    </linearGradient>
+    <linearGradient id="escudo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e7490" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0e7490" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="acento" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.5" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grilla" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#1e293b" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="halo" cx="0.12" cy="0.5" r="0.45">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="360" fill="url(#fondo)"/>
+  <rect width="1280" height="360" fill="url(#grilla)" opacity="0.55"/>
+  <rect width="1280" height="360" fill="url(#halo)"/>
+  <rect x="0" y="0" width="1280" height="4" fill="url(#acento)"/>
+
+  <!-- Escudo con anillos de escaneo -->
+  <g transform="translate(150 180)">
+    <circle r="128" fill="none" stroke="#22d3ee" stroke-opacity="0.12" stroke-width="1.5"/>
+    <circle r="104" fill="none" stroke="#22d3ee" stroke-opacity="0.2" stroke-width="1.5" stroke-dasharray="4 8"/>
+    <path d="M0 -112 L84 -80 V-4 C84 54 48 94 0 114 C-48 94 -84 54 -84 -4 V-80 Z"
+          fill="url(#escudo)" stroke="#22d3ee" stroke-width="4" stroke-linejoin="round"/>
+    <polyline points="-38,2 -10,30 42,-28" fill="none" stroke="#34d399" stroke-width="12"
+              stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Título -->
+  <text x="300" y="158" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="54" font-weight="700" fill="#f1f5f9" letter-spacing="-0.5">Auditor de Seguridad Web Local</text>
+  <text x="302" y="202" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="23" fill="#94a3b8">Detección y remediación de vulnerabilidades web en Windows</text>
+
+  <!-- Niveles de riesgo -->
+  <g font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="600" text-anchor="middle">
+    <rect x="302" y="234" width="104" height="30" rx="15" fill="#f97066" fill-opacity="0.16" stroke="#f97066"/>
+    <text x="354" y="254" fill="#f97066">CRÍTICO</text>
+    <rect x="418" y="234" width="84" height="30" rx="15" fill="#fb8a3c" fill-opacity="0.16" stroke="#fb8a3c"/>
+    <text x="460" y="254" fill="#fb8a3c">ALTO</text>
+    <rect x="514" y="234" width="94" height="30" rx="15" fill="#f5b83d" fill-opacity="0.16" stroke="#f5b83d"/>
+    <text x="561" y="254" fill="#f5b83d">MEDIO</text>
+    <rect x="620" y="234" width="84" height="30" rx="15" fill="#5aa9fa" fill-opacity="0.16" stroke="#5aa9fa"/>
+    <text x="662" y="254" fill="#5aa9fa">BAJO</text>
+    <rect x="716" y="234" width="76" height="30" rx="15" fill="#98a2b3" fill-opacity="0.16" stroke="#98a2b3"/>
+    <text x="754" y="254" fill="#98a2b3">INFO</text>
+  </g>
+
+  <!-- Firma -->
+  <g font-family="Consolas, 'Cascadia Mono', 'Courier New', monospace" text-anchor="end">
+    <text x="1236" y="300" font-size="15" fill="#64748b">// by</text>
+    <text x="1236" y="330" font-size="26" font-weight="700" fill="#22d3ee" letter-spacing="1">FreemanHack</text>
+  </g>
+</svg>
