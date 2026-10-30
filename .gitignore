@@ -1,0 +1,7 @@
+# Informes, respaldos y registros generados: contienen datos del equipo auditado
+informes/
+pruebas/resultados/
+respaldo-*/
+*.log
+informe-*.html
+informe-*.json
