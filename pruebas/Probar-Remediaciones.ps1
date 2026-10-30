@@ -7,7 +7,8 @@
     Pensado para ejecutarse en un entorno desechable (Windows Sandbox o una máquina virtual con
     instantánea). El flujo es:
 
-      1. Introduce configuraciones inseguras conocidas y levanta un servidor web vulnerable de prueba.
+      1. Introduce configuraciones inseguras conocidas y levanta servidores web vulnerables de prueba:
+         uno en todas las interfaces, otro solo en la IP de la red y otro solo en IPv6 loopback.
       2. Ejecuta el auditor y registra los hallazgos iniciales.
       3. Respalda el registro y el firewall igual que lo hace el auditor.
       4. Aplica cada remediación automatizable tal como figura en el JSON del informe.
@@ -163,6 +164,28 @@ try {
             $r.Close()
         }
     }
+    # Servidores que no escuchan en 127.0.0.1: uno atado solo a la IP de la red y otro solo a IPv6
+    # loopback. Comprueban que el auditor los sondea en la dirección donde escuchan. Se usa
+    # TcpListener porque HttpListener (http.sys) escucha siempre en todas las interfaces.
+    $servidorTcp = {
+        param([string]$Ip, [int]$Puerto)
+        $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Parse($Ip), $Puerto)
+        $l.Start()
+        while ($true) {
+            $c = $l.AcceptTcpClient()
+            $s = $c.GetStream()
+            $buffer = New-Object byte[] 4096
+            [void]$s.Read($buffer, 0, $buffer.Length)
+            $cuerpo = '<html><head><title>Index of /</title></head><body><h1>Index of /</h1></body></html>'
+            $respuesta = "HTTP/1.1 200 OK`r`nContent-Type: text/html`r`nContent-Length: $($cuerpo.Length)`r`nConnection: close`r`n`r`n$cuerpo"
+            $bytes = [Text.Encoding]::ASCII.GetBytes($respuesta)
+            $s.Write($bytes, 0, $bytes.Length)
+            $c.Close()
+        }
+    }
+    $ipRed = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' } | Select-Object -First 1).IPAddress
+    $servidorRed = Start-Job -ScriptBlock $servidorTcp -ArgumentList $ipRed, 8081
+    $servidorIpv6 = Start-Job -ScriptBlock $servidorTcp -ArgumentList '::1', 8008
     Start-Sleep -Seconds 3
 
     # -----------------------------------------------------------------------
@@ -181,14 +204,16 @@ try {
     Write-Registro '|---|---|'
     $esperadas = [ordered]@{
         'Servicio expuesto en 0.0.0.0:8080' = 'accesible desde la red \(puerto 8080\)'
-        'Listado de directorios'            = '^Listado de directorios habilitado en http://127\.0\.0\.1:8080'
-        'CORS que refleja el origen'        = '^CORS refleja cualquier origen en http://127\.0\.0\.1:8080'
-        'Cookie sin atributos'              = '^Cookies sin atributos de seguridad en http://127\.0\.0\.1:8080'
-        'Versión visible (X-Powered-By)'    = '^Divulgación de versión del software en http://127\.0\.0\.1:8080'
-        'Cabeceras de seguridad ausentes'   = '^Cabeceras de seguridad ausentes en http://127\.0\.0\.1:8080'
-        'Archivo .env publicado'            = '^Archivo \.env accesible en http://127\.0\.0\.1:8080'
-        'Repositorio .git publicado'        = '^Repositorio Git publicado .* en http://127\.0\.0\.1:8080'
+        'Listado de directorios'            = '^Listado de directorios habilitado en http://(127\.0\.0\.1|\[::1\]):8080'
+        'CORS que refleja el origen'        = '^CORS refleja cualquier origen en http://(127\.0\.0\.1|\[::1\]):8080'
+        'Cookie sin atributos'              = '^Cookies sin atributos de seguridad en http://(127\.0\.0\.1|\[::1\]):8080'
+        'Versión visible (X-Powered-By)'    = '^Divulgación de versión del software en http://(127\.0\.0\.1|\[::1\]):8080'
+        'Cabeceras de seguridad ausentes'   = '^Cabeceras de seguridad ausentes en http://(127\.0\.0\.1|\[::1\]):8080'
+        'Archivo .env publicado'            = '^Archivo \.env accesible en http://(127\.0\.0\.1|\[::1\]):8080'
+        'Repositorio .git publicado'        = '^Repositorio Git publicado .* en http://(127\.0\.0\.1|\[::1\]):8080'
         'Redirección en el archivo hosts'   = '^Archivo hosts redirige dominios sensibles'
+        'Servidor solo en la IP de la red (puerto 8081)' = "^Listado de directorios habilitado en http://$([regex]::Escape($ipRed)):8081"
+        'Servidor solo en IPv6 loopback (puerto 8008)'   = '^Listado de directorios habilitado en http://\[::1\]:8008'
     }
     foreach ($k in $esperadas.Keys) {
         $ok = @($vulnInicial | Where-Object { $_ -match $esperadas[$k] }).Count -gt 0
@@ -310,7 +335,7 @@ try {
     Write-Registro "- Remediaciones correctas: $($resultados.Count - $fallos) de $($resultados.Count)"
     Write-Registro "- Reversión completa: $(if (-not $faltan.Count -and -not $sobran.Count) { 'Sí' } else { 'No' })"
 
-    Stop-Job $servidor -ErrorAction SilentlyContinue
+    Stop-Job $servidor, $servidorRed, $servidorIpv6 -ErrorAction SilentlyContinue
     Set-Content -Path $archivoEstado -Value 'completado' -Encoding UTF8
 } catch {
     Write-Registro ''

@@ -21,7 +21,7 @@ El flujo tiene tres etapas:
 2. **Clasificación:** cada hallazgo recibe un nivel de riesgo y todos se reúnen en un informe HTML.
 3. **Remediación:** la consola ofrece aplicar las remediaciones disponibles. Cada una muestra el comando exacto y pide confirmación, y antes del primer cambio se respaldan el registro y el firewall.
 
-> **Alcance:** la herramienta solo audita el equipo en el que se ejecuta. Los servidores web se analizan únicamente a través de `127.0.0.1`; no se analizan hosts remotos.
+> **Alcance:** la herramienta solo revisa el equipo en el que se ejecuta. Si encuentra servidores web en él, los analiza en la dirección del propio equipo donde escucha cada uno (`127.0.0.1`, `::1` o su IP de red). Nunca escanea otros equipos de la red ni sitios de internet.
 
 <p align="center">
   <img src="assets/informe.png" alt="Informe HTML con nivel de riesgo global, distribución de hallazgos y listado por severidad" width="85%">
@@ -121,7 +121,7 @@ flowchart LR
 ```
 
 1. **Inicio.** El script comprueba si tiene permisos de administrador y si `winget` está disponible, porque de eso depende qué verificaciones y remediaciones puede ejecutar.
-2. **Auditoría.** Se ejecutan once verificaciones independientes, cada una dedicada a un área: sistema operativo, firewall, antivirus, puertos en escucha, servidores web, protocolos TLS, resolución de nombres, navegadores, software obsoleto, archivo `hosts` y proxy. Esta etapa solo lee la configuración. Las peticiones a los servidores web se envían a `127.0.0.1`, sin seguir redirecciones ni pasar por el proxy del sistema.
+2. **Auditoría.** Se ejecutan once verificaciones independientes, cada una dedicada a un área: sistema operativo, firewall, antivirus, puertos en escucha, servidores web, protocolos TLS, resolución de nombres, navegadores, software obsoleto, archivo `hosts` y proxy. Esta etapa solo lee la configuración. Cada servidor web se analiza en la dirección del propio equipo donde escucha (`127.0.0.1`, `::1` o la IP de red), sin seguir redirecciones ni pasar por el proxy del sistema.
 3. **Clasificación.** Cada hallazgo recibe un nivel de riesgo. Si un servidor web solo es accesible desde el propio equipo, sus hallazgos bajan un nivel, salvo los de CORS. Con todos los hallazgos se calculan el nivel global (el más grave) y la puntuación de exposición (la suma de los pesos).
 4. **Informe.** Se generan el informe HTML, que se abre en el navegador, y el JSON con los mismos datos.
 5. **Remediación.** Salvo que se haya indicado `-SoloEscaneo`, la consola lista los hallazgos con remediación disponible. Antes del primer cambio se respaldan el registro y el firewall; después, cada remediación muestra su comando, pide confirmación, se ejecuta y queda registrada. Al terminar, el informe se regenera con el estado actualizado.
@@ -335,7 +335,7 @@ La carpeta `pruebas/` contiene una prueba de extremo a extremo que valida la det
 | Script | Función |
 |---|---|
 | `Iniciar-PruebaSandbox.ps1` | Abre Windows Sandbox con el proyecto montado en solo lectura y ejecuta la prueba automáticamente. La ventana se cierra al terminar y todos los cambios se descartan. |
-| `Probar-Remediaciones.ps1` | Introduce configuraciones inseguras y un servidor web vulnerable, audita, aplica cada remediación automatizable, vuelve a auditar y comprueba que la reversión documentada deja el equipo en su estado inicial. |
+| `Probar-Remediaciones.ps1` | Introduce configuraciones inseguras y tres servidores web vulnerables (en todas las interfaces, solo en la IP de la red y solo en IPv6), audita, aplica cada remediación automatizable, vuelve a auditar y comprueba que la reversión documentada deja el equipo en su estado inicial. |
 
 ```powershell
 .\pruebas\Iniciar-PruebaSandbox.ps1
@@ -347,8 +347,8 @@ El resultado se guarda en Markdown en `pruebas\resultados\`. Requiere Windows 10
 
 **Último resultado (Windows 10, compilación 19041, Windows Sandbox):**
 
-- 9 de 9 vulnerabilidades introducidas detectadas.
-- 11 de 11 remediaciones automatizables aplicadas y confirmadas al volver a auditar.
+- 11 de 11 vulnerabilidades introducidas detectadas.
+- 12 de 12 remediaciones automatizables aplicadas y confirmadas al volver a auditar.
 - Reversión completa: los hallazgos finales coinciden con los iniciales.
 
 Las remediaciones que dependen de `winget` y las que abren una interfaz (Windows Update, Programas y características, Bloc de notas) no se prueban de forma automática.
@@ -356,6 +356,7 @@ Las remediaciones que dependen de `winget` y las que abren una interfaz (Windows
 ## Limitaciones
 
 - Solo se analizan los servidores web que escuchan en puertos habituales: 80, 443, 3000, 4200, 5000, 5173, 8000, 8008, 8080, 8081, 8443, 8888, 9000 y 9090.
+- Los servidores que solo escuchan en direcciones IPv6 de enlace local (`fe80::`) se detectan, pero no se analizan por HTTP, porque esas direcciones requieren indicar la interfaz de red.
 - La exposición se deduce de la dirección de escucha. No se tiene en cuenta si alguna regla de firewall ya bloquea el acceso.
 - Para evitar falsos positivos en aplicaciones SPA, los archivos sensibles se confirman por su contenido. Aun así, esto no reemplaza un análisis dinámico completo con herramientas como OWASP ZAP, Burp Suite o Nikto.
 - Un navegador con una versión anterior se marca como desactualizado aunque pertenezca al canal ESR o tenga la versión fijada por una directiva corporativa.

@@ -69,6 +69,7 @@ La remediación se guarda como texto y no como bloque de código, para que se pu
 | `Test-Antivirus` | Defender y antivirus de terceros | `Get-MpComputerStatus`, `root/SecurityCenter2` |
 | `Test-PuertosWeb` | Puertos en escucha y exposición a la red | `Get-NetTCPConnection` |
 | `Test-ServidoresWeb` | Recorre los servicios web detectados | `$script:ServiciosWeb` |
+| `Get-DestinosSonda` | Direcciones locales donde sondear cada servidor | Direcciones de escucha de `Get-NetTCPConnection` |
 | `Test-ServidorWeb` | Cabeceras, CORS, cookies, listado y archivos sensibles de un servidor | `Invoke-Sonda` |
 | `Test-ProtocolosTLS` | SChannel y criptografía de .NET | Registro (`SCHANNEL`, `.NETFramework`) |
 | `Test-ResolucionNombres` | LLMNR y NetBIOS | Registro (`DNSClient`), `Win32_NetworkAdapterConfiguration` |
@@ -79,6 +80,18 @@ La remediación se guarda como texto y no como bloque de código, para que se pu
 | `Test-Proxy` | Proxy manual y script PAC | Registro (`Internet Settings`) |
 
 Las verificaciones son independientes entre sí, con una excepción: `Test-ServidoresWeb` usa los servicios que detectó antes `Test-PuertosWeb`, así que ese orden debe mantenerse.
+
+Cada servicio web se sondea en las direcciones donde escucha, según esta correspondencia de `Get-DestinosSonda`:
+
+| Dirección de escucha | Dirección sondeada |
+|---|---|
+| `0.0.0.0` (todas las interfaces IPv4) | `127.0.0.1` |
+| `::` (todas las interfaces IPv6, normalmente en modo dual) | `127.0.0.1` y, si no responde, `[::1]` |
+| `127.x.x.x` o `::1` | La misma dirección |
+| IPv4 o IPv6 concreta de la red | La misma dirección |
+| `fe80::` (enlace local) | Ninguna: requiere identificador de zona |
+
+Todas son direcciones del propio equipo, por lo que el tráfico no sale de él.
 
 ### Resultados
 

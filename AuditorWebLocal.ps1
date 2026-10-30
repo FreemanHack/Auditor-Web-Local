@@ -464,7 +464,7 @@ function Test-PuertosWeb {
                       elseif ($proc) { "$($proc.ProcessName) (PID $procId)" } else { "PID $procId" }
         $servicio = if ($esWeb) { $script:PuertosWeb[$puerto] } else { $script:PuertosDatos[$puerto] }
         if ($esWeb) {
-            $script:ServiciosWeb.Add([pscustomobject]@{ Puerto = $puerto; Expuesto = $expuesto; Proceso = $nombreProc })
+            $script:ServiciosWeb.Add([pscustomobject]@{ Puerto = $puerto; Expuesto = $expuesto; Proceso = $nombreProc; Direcciones = $direcciones })
         }
 
         $desc = "Puerto TCP $puerto ($servicio) en escucha por $nombreProc en: $($direcciones -join ', ')."
@@ -491,13 +491,47 @@ function Test-PuertosWeb {
     }
 }
 
+function Get-DestinosSonda {
+    <#
+    .SYNOPSIS
+        Traduce las direcciones de escucha de un servicio en las direcciones a las que se envían las sondas.
+    .DESCRIPTION
+        Un servidor solo responde en las direcciones donde escucha. Si se probara siempre 127.0.0.1,
+        quedarían sin analizar los servidores atados a una IP concreta de la red o solo a IPv6.
+        Todas las direcciones resultantes pertenecen al propio equipo: el tráfico hacia ellas no
+        sale de él. Se ordenan con loopback primero, porque es la vía más fiable.
+    .PARAMETER Direcciones
+        Direcciones de escucha informadas por Get-NetTCPConnection.
+    .OUTPUTS
+        Direcciones listas para usar en una URL (las IPv6 van entre corchetes).
+    #>
+    param([string[]]$Direcciones)
+    $destinos = New-Object System.Collections.Generic.List[string]
+    foreach ($d in $Direcciones) {
+        $candidatos = switch -Regex ($d) {
+            '^0\.0\.0\.0$' { '127.0.0.1'; break }            # todas las interfaces IPv4
+            # Todas las interfaces IPv6. En Windows suele ser un socket de modo dual que también
+            # acepta IPv4, así que se prueba primero 127.0.0.1 y, si no responde, ::1.
+            '^::$'         { '127.0.0.1'; '[::1]'; break }
+            '^fe80:'       { break }                         # enlace local: requiere identificador de zona
+            ':'            { "[$d]"; break }                 # IPv6 concreta, incluida ::1
+            default        { $d }                            # IPv4 concreta, incluida 127.0.0.1
+        }
+        foreach ($c in @($candidatos)) {
+            if ($c -and -not $destinos.Contains($c)) { $destinos.Add($c) }
+        }
+    }
+    @($destinos | Sort-Object { if ($_ -like '127.*') { 0 } elseif ($_ -eq '[::1]') { 1 } else { 2 } })
+}
+
 function Test-ServidorWeb {
     <#
     .SYNOPSIS
         Analiza un servidor web local: cabeceras, CORS, cookies, listado de directorios y archivos sensibles.
     .DESCRIPTION
-        Primero determina si el puerto habla HTTP o HTTPS. Después evalúa la respuesta de la raíz y
-        solicita cada ruta de $script:RutasSensibles. Si el servicio solo escucha en loopback, el
+        Primero determina si el puerto habla HTTP o HTTPS, probando cada dirección local donde
+        escucha el servicio (ver Get-DestinosSonda). Después evalúa la respuesta de la raíz y
+        solicita cada ruta de $script:RutasSensibles en la dirección que respondió. Si el servicio solo escucha en loopback, el
         riesgo de los hallazgos baja un nivel, excepto en CORS (ver comentario en esa sección).
     .PARAMETER Servicio
         Objeto con Puerto, Expuesto y Proceso, generado por Test-PuertosWeb.
@@ -511,15 +545,19 @@ function Test-ServidorWeb {
     # Un 400 suele indicar que se habló HTTP a un puerto HTTPS (o al revés). Se guarda como reserva
     # y se prueba el otro esquema antes de darlo por válido.
     $resp = $null; $reserva = $null
-    foreach ($e in $esquemas) {
-        $r = Invoke-Sonda -Url "${e}://127.0.0.1:$p/" -Origen $origenPrueba
-        if (-not $r) { continue }
-        if ($r.Codigo -ne 400) { $resp = $r; break }
-        if (-not $reserva) { $reserva = $r }
+    $destinos = Get-DestinosSonda $Servicio.Direcciones
+    foreach ($destino in $destinos) {
+        foreach ($e in $esquemas) {
+            $r = Invoke-Sonda -Url "${e}://${destino}:$p/" -Origen $origenPrueba
+            if (-not $r) { continue }
+            if ($r.Codigo -ne 400) { $resp = $r; break }
+            if (-not $reserva) { $reserva = $r }
+        }
+        if ($resp) { break }
     }
     if (-not $resp) { $resp = $reserva }
     if (-not $resp) {
-        Add-Hallazgo @{ Categoria = 'Servidores web'; Titulo = "El servicio del puerto $p no respondió a HTTP/HTTPS"; Riesgo = 'Info'; Detalle = "Proceso: $($Servicio.Proceso). Puede tratarse de un servicio que no utiliza HTTP." }
+        Add-Hallazgo @{ Categoria = 'Servidores web'; Titulo = "El servicio del puerto $p no respondió a HTTP/HTTPS"; Riesgo = 'Info'; Detalle = "Proceso: $($Servicio.Proceso). Direcciones probadas: $(if ($destinos.Count) { $destinos -join ', ' } else { 'ninguna sondeable' }). Puede tratarse de un servicio que no utiliza HTTP." }
         return
     }
 

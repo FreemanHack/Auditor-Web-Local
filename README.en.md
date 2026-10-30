@@ -21,7 +21,7 @@ The workflow has three stages:
 2. **Classification:** each finding is assigned a risk level and all of them are compiled into an HTML report.
 3. **Remediation:** the console offers to apply the available fixes. Each one shows the exact command and asks for confirmation, and the registry and firewall are backed up before the first change.
 
-> **Scope:** the tool only audits the machine it runs on. Web servers are probed exclusively through `127.0.0.1`; remote hosts are never scanned.
+> **Scope:** the tool only checks the machine it runs on. If it finds web servers there, it analyzes each one on the local address where it listens (`127.0.0.1`, `::1` or the machine's network IP). It never scans other machines on the network or internet sites.
 
 > **Language note:** the tool's console output and HTML report are in Spanish. Parameter names are in Spanish as well (for example, `-SoloEscaneo` means *scan only*).
 
@@ -123,7 +123,7 @@ flowchart LR
 ```
 
 1. **Start.** The script checks whether it has administrator rights and whether `winget` is available, since this determines which checks and remediations it can run.
-2. **Audit.** Eleven independent checks run, each covering one area: operating system, firewall, antivirus, listening ports, web servers, TLS protocols, name resolution, browsers, outdated software, `hosts` file and proxy. This stage only reads the configuration. Requests to web servers are sent to `127.0.0.1`, without following redirects or going through the system proxy.
+2. **Audit.** Eleven independent checks run, each covering one area: operating system, firewall, antivirus, listening ports, web servers, TLS protocols, name resolution, browsers, outdated software, `hosts` file and proxy. This stage only reads the configuration. Each web server is analyzed on the local address where it listens (`127.0.0.1`, `::1` or the network IP), without following redirects or going through the system proxy.
 3. **Classification.** Each finding is assigned a risk level. If a web server is only reachable from the machine itself, its findings are lowered by one level, except for CORS. All findings are then used to compute the overall level (the most severe one) and the exposure score (the sum of the weights).
 4. **Report.** The HTML report, which opens in the browser, and the JSON file with the same data are generated.
 5. **Remediation.** Unless `-SoloEscaneo` was specified, the console lists the findings that have a remediation available. The registry and firewall are backed up before the first change; then each remediation shows its command, asks for confirmation, runs and is logged. When finished, the report is regenerated with the updated status.
@@ -337,7 +337,7 @@ The `pruebas/` folder contains an end-to-end test that validates detection, reme
 | Script | Purpose |
 |---|---|
 | `Iniciar-PruebaSandbox.ps1` | Opens Windows Sandbox with the project mounted read-only and runs the test automatically. The window closes when it finishes and all changes are discarded. |
-| `Probar-Remediaciones.ps1` | Introduces insecure settings and a vulnerable web server, audits, applies every automatable remediation, audits again and checks that the documented rollback returns the machine to its initial state. |
+| `Probar-Remediaciones.ps1` | Introduces insecure settings and three vulnerable web servers (on all interfaces, only on the network IP and only on IPv6), audits, applies every automatable remediation, audits again and checks that the documented rollback returns the machine to its initial state. |
 
 ```powershell
 .\pruebas\Iniciar-PruebaSandbox.ps1
@@ -349,8 +349,8 @@ The result is saved as Markdown in `pruebas\resultados\`. It requires Windows 10
 
 **Latest result (Windows 10, build 19041, Windows Sandbox):**
 
-- 9 out of 9 introduced vulnerabilities detected.
-- 11 out of 11 automatable remediations applied and confirmed by a second audit.
+- 11 out of 11 introduced vulnerabilities detected.
+- 12 out of 12 automatable remediations applied and confirmed by a second audit.
 - Full rollback: the final findings match the initial ones.
 
 Remediations that depend on `winget` and those that open a user interface (Windows Update, Programs and Features, Notepad) are not tested automatically.
@@ -358,6 +358,7 @@ Remediations that depend on `winget` and those that open a user interface (Windo
 ## Limitations
 
 - Only web servers listening on common ports are analyzed: 80, 443, 3000, 4200, 5000, 5173, 8000, 8008, 8080, 8081, 8443, 8888, 9000 and 9090.
+- Servers listening only on IPv6 link-local addresses (`fe80::`) are detected but not analyzed over HTTP, because those addresses require specifying the network interface.
 - Exposure is inferred from the listening address. Existing firewall rules that may already block access are not taken into account.
 - To avoid false positives in SPA applications, sensitive files are confirmed by their content. Even so, this does not replace a full dynamic scan with tools such as OWASP ZAP, Burp Suite or Nikto.
 - A browser running an older version is flagged as outdated even if it belongs to the ESR channel or its version is pinned by corporate policy.
