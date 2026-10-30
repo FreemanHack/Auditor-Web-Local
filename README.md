@@ -107,7 +107,7 @@ Detectar estas debilidades lleva unos minutos por equipo. Responder a un inciden
 ## Cómo funciona
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Inicio] --> B["Auditoría<br/>(solo lectura)"]
     B --> C[Clasificación<br/>por riesgo]
     C --> D[Informe<br/>HTML + JSON]

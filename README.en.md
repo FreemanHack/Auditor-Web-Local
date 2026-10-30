@@ -109,7 +109,7 @@ Detecting these weaknesses takes a few minutes per machine. Responding to an inc
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Start] --> B["Audit<br/>(read-only)"]
     B --> C[Risk<br/>classification]
     C --> D[Report<br/>HTML + JSON]
